@@ -64,7 +64,7 @@ Before installing, ensure you have:
 
 1️⃣ **Clone the Repository**  
 ```bash
-git clone https://github.com/your-repo/image-search-ai.git
+git clone https://github.com/durjoy221B/Smart-Gallery-Multimodal-RAG-.git
 cd image-search-ai
 ```  
 
