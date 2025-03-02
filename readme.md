@@ -65,7 +65,7 @@ Before installing, ensure you have:
 1️⃣ **Clone the Repository**  
 ```bash
 git clone https://github.com/durjoy221B/Smart-Gallery-Multimodal-RAG-.git
-cd image-search-ai
+cd Smart-Gallery-Multimodal-RAG-
 ```  
 
 2️⃣ **Create a Virtual Environment (Recommended)**  
