@@ -1,0 +1,388 @@
+{% extends "index.html" %}
+
+{% block title %}Chat & Search | AI-Powered Gallery{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-box" id="chat-box"></div>
+    <div class="input-area">
+        <div id="image-preview" style="display: none;">
+            <span>Preview:</span>
+            <img id="preview-img" src="" alt="Image Preview">
+            <span id="preview-text"></span>
+        </div>
+        <div class="input-group">
+            <input type="file" id="file-upload" accept="image/*" style="display: none;">
+            <button id="upload-btn" onclick="document.getElementById('file-upload').click();">Upload Image</button>
+            <input type="text" id="user-input" placeholder="Type a message or search...">
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for image details -->
+<div id="imageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background-color: white; padding: 20px; border-radius: 8px; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; position: relative;">
+        <span id="closeModal" style="position: absolute; top: 10px; right: 10px; font-size: 24px; cursor: pointer;">×</span>
+        <img id="modalImage" style="width: 100%; max-height: 400px; object-fit: contain; border-radius: 8px; margin-bottom: 20px; cursor: zoom-in; transition: transform 0.3s ease;" alt="Selected Image">
+        <h3 style="color: #3a4664; margin-bottom: 10px;">Image Details</h3>
+        <div id="modalDetails" style="margin-bottom: 20px; color: #333;"></div>
+    </div>
+</div>
+
+<style>
+    /* [Unchanged CSS from your original code] */
+    .chat-container {
+        width: 100%;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 90px);
+    }
+    .chat-box {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    .chat-box > div {
+        max-width: 80%;
+        margin: 10px 0;
+        padding: 12px 16px;
+        border-radius: 12px;
+        word-wrap: break-word;
+    }
+    .chat-box > div.user {
+        background-color: #546799;
+        color: white;
+        margin-left: auto;
+        text-align: right;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .chat-box > div.bot {
+        background-color: #e9ecef;
+        color: #333;
+        margin-left: auto;
+        text-align: right;
+    }
+    .input-area {
+        padding-top: 20px;
+    }
+    #image-preview {
+        align-items: center;
+        gap: 5px;
+        padding: 5px;
+        background-color: #f0f0f0;
+        border-radius: 4px;
+    }
+    #preview-img {
+        width: 30px;
+        height: 30px;
+        border-radius: 3px;
+        object-fit: cover;
+    }
+    .input-group {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    #user-input {
+        flex: 1;
+        padding: 12px;
+        font-size: 16px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        outline: none;
+    }
+    #user-input:focus {
+        border-color: #546799;
+        box-shadow: 0 0 5px rgba(234, 160, 162, 0.5);
+    }
+    button {
+        padding: 12px 20px;
+        font-size: 16px;
+        background-color: #546799;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    button:hover {
+        background-color: #3a4664;
+    }
+    .result-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .result-container span {
+        font-size: 12px;
+        color: #555;
+        margin-top: 5px;
+    }
+    .combined-description {
+        margin-bottom: 15px;
+        font-size: 14px;
+        color: #333;
+        text-align: right;
+    }
+    .user-image-preview {
+        width: 40px;
+        height: 40px;
+        border-radius: 4px;
+        object-fit: cover;
+    }
+</style>
+
+<script>
+    const colorNames = {
+        "#ff0000": "Red",
+        "#00ff00": "Green",
+        "#0000ff": "Blue",
+        "#ffff00": "Yellow",
+        "#ff4500": "OrangeRed",
+        "#ffd700": "Gold",
+        "#1e90ff": "DodgerBlue",
+        "#808080": "Gray",
+        "#000000": "Black",
+        "#ffffff": "White"
+    };
+
+    function getColorName(hex) {
+        hex = hex.toLowerCase();
+        return colorNames[hex] || hex;
+    }
+
+    let uploadedImageSrc = null;
+    let chatHistory = []; // Store all query responses
+
+    document.getElementById("file-upload").addEventListener("change", function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedImageSrc = e.target.result;
+                document.getElementById("preview-img").src = e.target.result;
+                document.getElementById("preview-text").textContent = file.name;
+                document.getElementById("image-preview").style.display = "flex";
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    function addMessage(content, isUser = false, isImageGroup = false, imageSrc = null) {
+        const chatBox = document.getElementById("chat-box");
+        const div = document.createElement("div");
+        div.className = isUser ? "user" : "bot";
+
+        if (isUser) {
+            if (imageSrc) {
+                div.innerHTML = `<img class="user-image-preview" src="${imageSrc}" alt="Uploaded Image"> ${content ? content : ''}`;
+            } else {
+                div.textContent = content;
+            }
+        } else if (!isImageGroup) {
+            div.textContent = content;
+        } else {
+            div.style.display = "flex";
+            div.style.flexDirection = "column";
+            div.style.alignItems = "flex-end";
+            div.innerHTML = content;
+        }
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function showImageDetails(imageData) {
+        console.log("showImageDetails called with:", imageData);
+        const modal = document.getElementById("imageModal");
+        const modalImage = document.getElementById("modalImage");
+        const modalDetails = document.getElementById("modalDetails");
+
+        modalImage.src = imageData.image_url;
+        modalDetails.innerHTML = "";
+
+        if (!imageData.metadata) {
+            modalDetails.innerHTML = "<p>No metadata available.</p>";
+            modal.style.display = "flex";
+            return;
+        }
+
+        const detailsList = document.createElement("ul");
+        detailsList.style.listStyle = "none";
+        detailsList.style.padding = "0";
+
+        const ambienceItem = document.createElement("li");
+        ambienceItem.innerHTML = `<strong>Ambience:</strong> ${imageData.metadata.ambience || "Not specified"}`;
+        detailsList.appendChild(ambienceItem);
+
+        const tagsItem = document.createElement("li");
+        tagsItem.innerHTML = `<strong>Tags:</strong> ${imageData.metadata.tags || "None"}`;
+        tagsItem.style.marginTop = "10px";
+        detailsList.appendChild(tagsItem);
+
+        const objectsItem = document.createElement("li");
+        objectsItem.innerHTML = `<strong>Objects:</strong> ${imageData.metadata.objects || "None"}`;
+        objectsItem.style.marginTop = "10px";
+        detailsList.appendChild(objectsItem);
+
+        const colorsItem = document.createElement("li");
+        colorsItem.style.marginTop = "10px";
+        colorsItem.innerHTML = "<strong>Dominant Colors:</strong>";
+        const colorsDiv = document.createElement("div");
+        colorsDiv.style.display = "flex";
+        colorsDiv.style.gap = "15px";
+        colorsDiv.style.marginTop = "5px";
+        colorsDiv.style.flexWrap = "wrap";
+
+        const colors = imageData.metadata.dominant_colors ? imageData.metadata.dominant_colors.split(",") : [];
+        colors.forEach(color => {
+            const colorContainer = document.createElement("div");
+            colorContainer.style.display = "flex";
+            colorContainer.style.flexDirection = "column";
+            colorContainer.style.alignItems = "center";
+
+            const colorBox = document.createElement("div");
+            colorBox.style.width = "30px";
+            colorBox.style.height = "30px";
+            colorBox.style.backgroundColor = color;
+            colorBox.style.border = "1px solid #ddd";
+            colorBox.style.borderRadius = "4px";
+
+            const colorName = document.createElement("span");
+            colorName.innerText = getColorName(color);
+            colorName.style.fontSize = "12px";
+            colorName.style.color = "#555";
+            colorName.style.marginTop = "5px";
+
+            colorContainer.appendChild(colorBox);
+            colorContainer.appendChild(colorName);
+            colorsDiv.appendChild(colorContainer);
+        });
+
+        colorsItem.appendChild(colorsDiv);
+        detailsList.appendChild(colorsItem);
+
+        modalDetails.appendChild(detailsList);
+
+        modal.style.display = "flex";
+
+        let isZoomed = false;
+        modalImage.onclick = function() {
+            if (!isZoomed) {
+                modalImage.style.transform = "scale(1.5)";
+                modalImage.style.cursor = "zoom-out";
+                isZoomed = true;
+            } else {
+                modalImage.style.transform = "scale(1)";
+                modalImage.style.cursor = "zoom-in";
+                isZoomed = false;
+            }
+        };
+
+        document.getElementById("closeModal").onclick = function() {
+            modal.style.display = "none";
+            modalImage.style.transform = "scale(1)";
+            isZoomed = false;
+        };
+        modal.onclick = function(event) {
+            if (event.target === modal) {
+                modal.style.display = "none";
+                modalImage.style.transform = "scale(1)";
+                isZoomed = false;
+            }
+        };
+    }
+
+    async function handleSend() {
+        const query = document.getElementById("user-input").value.trim();
+        const fileInput = document.getElementById("file-upload");
+        const file = fileInput.files[0];
+
+        if (!query && !file) {
+            addMessage("⚠️ Please provide text or an image.", false);
+            return;
+        }
+
+        const formData = new FormData();
+        if (query) formData.append("query", query);
+        if (file) formData.append("file", file);
+
+        addMessage(query, true, false, file ? uploadedImageSrc : null);
+
+        try {
+            const response = await fetch("/search/", {
+                method: "POST",
+                body: formData
+            });
+            if (!response.ok) throw new Error(`Server error: ${response.status}`);
+            const data = await response.json();
+            console.log("Server response:", data);
+
+            // Store the response in chatHistory
+            chatHistory.push({ query, file: file ? uploadedImageSrc : null, response: data });
+
+            if (data.conversation_response) {
+                addMessage(data.conversation_response, false);
+            } else if (data.image_search_results && data.image_search_results.results) {
+                const results = data.image_search_results.results;
+                const combinedDescription = data.image_search_results.combined_description;
+                if (results.length > 0 && !results[0].message) {
+                    let imageHtml = `<div class="combined-description">${combinedDescription}</div>`;
+                    imageHtml += '<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: flex-end;">';
+                    results.forEach((result, index) => {
+                        // Use data attributes to store result data instead of window functions
+                        imageHtml += `
+                            <div class="result-container" data-result='${JSON.stringify(result)}'>
+                                <img src="${result.image_url}" alt="Result" style="width: 120px; height: 120px; border-radius: 8px; cursor: pointer;">
+                                <span>Similarity: ${(result.similarity_score * 100).toFixed(1)}%</span>
+                            </div>`;
+                    });
+                    imageHtml += '</div>';
+                    addMessage(imageHtml, false, true);
+
+                    // Add event listeners after DOM update
+                    document.querySelectorAll('.result-container img').forEach(img => {
+                        img.removeEventListener('click', handleImageClick); // Prevent duplicate listeners
+                        img.addEventListener('click', handleImageClick);
+                    });
+                } else {
+                    addMessage(results[0].message || "No results found.", false);
+                }
+            } else {
+                addMessage("⚠️ Unexpected response from server.", false);
+            }
+        } catch (error) {
+            addMessage(`⚠️ Error: ${error.message}`, false);
+            console.error("Send error:", error);
+        }
+
+        document.getElementById("user-input").value = "";
+        fileInput.value = "";
+        document.getElementById("image-preview").style.display = "none";
+        uploadedImageSrc = null;
+    }
+
+    function handleImageClick(event) {
+        const resultContainer = event.target.closest('.result-container');
+        const resultData = JSON.parse(resultContainer.getAttribute('data-result'));
+        showImageDetails(resultData);
+    }
+
+    document.getElementById("send-btn").addEventListener("click", handleSend);
+    document.getElementById("user-input").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            handleSend();
+        }
+    });
+</script>
+{% endblock %}

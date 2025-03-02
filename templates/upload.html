@@ -1,0 +1,328 @@
+{% extends "index.html" %}
+
+{% block title %}Upload Images | AI-Powered Photo Gallery{% endblock %}
+
+{% block content %}
+    <h2 style="text-align: center;">Upload Images</h2>
+    <p style="text-align: center;">Choose multiple images from your device or capture them directly with your camera. 
+        <br> Our AI will analyze them, generate descriptions, and store them in the gallery.</p>
+
+    <div style="text-align: center; margin-top: 20px;">
+        <!-- File Upload Form -->
+        <form id="uploadForm" enctype="multipart/form-data" method="POST">
+            <label for="fileInput" style="font-size: 18px; font-weight: 500; color: #333; display: block; margin-bottom: 10px;">Select Images from Device:</label>
+            <input type="file" id="fileInput" name="files" accept="image/*" multiple
+                   style="margin: 10px 0; padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; display: block; margin-left: auto; margin-right: auto;">
+            <button type="submit" class="cta-button upload-button" style="margin: 10px;">Upload</button>
+        </form>
+
+        <!-- Camera Capture Button -->
+        <button id="cameraButton" class="cta-button" style="margin: 10px;">Capture from Camera</button>
+    </div>
+
+    <!-- Camera Modal -->
+    <div id="cameraModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; text-align: center;">
+            <video id="videoFeed" width="320" height="240" autoplay style="border-radius: 8px;"></video>
+            <div id="capturedImages" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;"></div>
+            <br>
+            <button id="captureButton" class="cta-button" style="margin: 10px;">Capture</button>
+            <button id="uploadCameraButton" class="cta-button upload-button" style="margin: 10px;">Upload Captured Images</button>
+            <button id="closeCamera" style="padding: 10px 20px; background-color: #f44336; color: white; margin: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 18px; transition: background-color 0.3s;">Close</button>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div id="progressContainer" style="margin-top: 20px; text-align: center; display: none;">
+        <p id="progressMessage" style="margin-bottom: 10px;">Uploading images...</p>
+        <div style="width: 50%; margin: 10px auto; background-color: #f3f3f3; border-radius: 8px; overflow: hidden;">
+            <div id="progressBar" style="width: 0%; height: 20px; background-color: #546799; text-align: center; color: white; transition: width 0.3s ease;"></div>
+        </div>
+        <span id="progressPercentage">0%</span>
+    </div>
+
+    <div id="uploadStatus" style="margin-top: 20px; text-align: center;"></div>
+
+    <div id="imagePreview" style="margin-top: 20px; display: none;">
+        <h3 style="text-align: center;">Uploaded Images:</h3>
+        <div id="uploadedImagesContainer" style="display: flex; flex-direction: column; gap: 20px; justify-content: flex-start; align-items: center;"></div>
+    </div>
+
+    <style>
+        .cta-button {
+            text-decoration: none;
+            background-color: #546799;
+            color: white;
+            font-size: 18px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+        .cta-button:hover {
+            background-color: #3a4664;
+        }
+        .upload-button {
+            background-color: #393b5375;
+        }
+        .upload-button:hover {
+            background-color: #00000075;
+        }
+        #closeCamera:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+
+    <script>
+        // Simple hex-to-name mapping (expand as needed)
+        const colorNames = {
+            "#ff0000": "Red",
+            "#00ff00": "Green",
+            "#0000ff": "Blue",
+            "#ffff00": "Yellow",
+            "#ff4500": "OrangeRed",
+            "#ffd700": "Gold",
+            "#1e90ff": "DodgerBlue",
+            "#808080": "Gray",
+            "#000000": "Black",
+            "#ffffff": "White"
+        };
+
+        function getColorName(hex) {
+            hex = hex.toLowerCase();
+            return colorNames[hex] || hex;
+        }
+
+        function filterDescription(description) {
+            const lines = description.split("\n");
+            return lines.filter(line => !line.startsWith("Dominant Colors:")).join("\n").trim();
+        }
+
+        // Handle file upload from device storage
+        document.getElementById("uploadForm").addEventListener("submit", async function (event) {
+            event.preventDefault();
+            const files = document.getElementById("fileInput").files;
+            if (files.length === 0) {
+                alert("Please select at least one image from your device to upload.");
+                return;
+            }
+            uploadFiles(files);
+        });
+
+        // Handle camera functionality
+        const cameraButton = document.getElementById("cameraButton");
+        const cameraModal = document.getElementById("cameraModal");
+        const videoFeed = document.getElementById("videoFeed");
+        const captureButton = document.getElementById("captureButton");
+        const uploadCameraButton = document.getElementById("uploadCameraButton");
+        const closeCamera = document.getElementById("closeCamera");
+        const capturedImages = document.getElementById("capturedImages");
+        let stream;
+        let capturedFiles = [];
+
+        cameraButton.addEventListener("click", async () => {
+            cameraModal.style.display = "block";
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoFeed.srcObject = stream;
+            } catch (err) {
+                alert("Error accessing camera: " + err.message);
+                cameraModal.style.display = "none";
+            }
+        });
+
+        closeCamera.addEventListener("click", () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            capturedFiles = [];
+            capturedImages.innerHTML = "";
+            cameraModal.style.display = "none";
+        });
+
+        captureButton.addEventListener("click", () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = videoFeed.videoWidth;
+            canvas.height = videoFeed.videoHeight;
+            canvas.getContext("2d").drawImage(videoFeed, 0, 0);
+            canvas.toBlob(blob => {
+                const file = new File([blob], `camera-capture-${capturedFiles.length + 1}.jpg`, { type: "image/jpeg" });
+                capturedFiles.push(file);
+
+                // Display thumbnail
+                const img = document.createElement("img");
+                img.src = URL.createObjectURL(blob);
+                img.style.width = "100px";
+                img.style.height = "auto";
+                img.style.borderRadius = "4px";
+                capturedImages.appendChild(img);
+            }, "image/jpeg");
+        });
+
+        uploadCameraButton.addEventListener("click", () => {
+            if (capturedFiles.length === 0) {
+                alert("Please capture at least one image to upload.");
+                return;
+            }
+            uploadFiles(capturedFiles);
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            capturedFiles = [];
+            capturedImages.innerHTML = "";
+            cameraModal.style.display = "none";
+        });
+
+        // Upload function (shared for file and camera)
+        function uploadFiles(files) {
+            let formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append("files", files[i]);
+            }
+
+            let progressContainer = document.getElementById("progressContainer");
+            let progressMessage = document.getElementById("progressMessage");
+            let progressBar = document.getElementById("progressBar");
+            let progressPercentage = document.getElementById("progressPercentage");
+            let uploadStatus = document.getElementById("uploadStatus");
+            let fileInput = document.getElementById("fileInput");  // Reference to the file input
+
+            progressContainer.style.display = "block";
+            progressMessage.innerText = "Uploading " + files.length + " image(s)...";
+            progressBar.style.width = "0%";
+            progressPercentage.innerText = "0%";
+            uploadStatus.innerText = "";
+
+            let xhr = new XMLHttpRequest();
+
+            xhr.upload.onprogress = function (event) {
+                if (event.lengthComputable) {
+                    let percentComplete = (event.loaded / event.total) * 50;
+                    progressBar.style.width = percentComplete + "%";
+                    progressPercentage.innerText = Math.round(percentComplete) + "%";
+                }
+            };
+
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    let result = JSON.parse(xhr.responseText);
+                    console.log("Backend response:", result);
+                    progressMessage.innerText = "Generating descriptions for " + files.length + " image(s)...";
+                    let progress = 50;
+                    let interval = setInterval(() => {
+                        progress += 10;
+                        progressBar.style.width = progress + "%";
+                        progressPercentage.innerText = Math.round(progress) + "%";
+                        if (progress >= 100) {
+                            clearInterval(interval);
+                            progressContainer.style.display = "none";
+                            displayImages(result);
+                            fileInput.value = "";  // Reset the file input after success
+                        }
+                    }, 200);
+                } else {
+                    progressContainer.style.display = "none";
+                    uploadStatus.innerHTML = "<p style='color: red;'>Error: " + JSON.parse(xhr.responseText).detail + "</p>";
+                }
+            };
+
+            xhr.onerror = function () {
+                progressContainer.style.display = "none";
+                uploadStatus.innerHTML = "<p style='color: red;'>Unexpected Error: Upload failed.</p>";
+            };
+
+            xhr.open("POST", "/upload-images/", true);
+            xhr.send(formData);
+        }
+
+        function displayImages(result) {
+            uploadStatus.innerHTML = "<p style='color: green;'>" + result.message + "</p>";
+
+            let imagesContainer = document.getElementById("uploadedImagesContainer");
+            imagesContainer.innerHTML = "";
+
+            result.uploaded_images.forEach(imageData => {
+                let imageDiv = document.createElement("div");
+                imageDiv.style.marginBottom = "20px";
+                imageDiv.style.maxWidth = "100%";
+                imageDiv.style.display = "flex";
+                imageDiv.style.flexDirection = "column";
+                imageDiv.style.alignItems = "center";
+
+                let img = document.createElement("img");
+                img.src = imageData.image_url;
+                img.alt = "Uploaded Image";
+                img.style.width = "100%";
+                img.style.maxWidth = "300px";
+                img.style.height = "auto";
+                img.style.border = "1px solid #ddd";
+                img.style.borderRadius = "8px";
+                img.style.boxShadow = "0px 4px 8px rgba(0, 0, 0, 0.1)";
+                img.style.transition = "transform 0.3s ease";
+                img.style.cursor = "pointer";
+
+                img.addEventListener("mouseover", () => {
+                    img.style.transform = "scale(1.05)";
+                });
+
+                img.addEventListener("mouseout", () => {
+                    img.style.transform = "scale(1)";
+                });
+
+                let description = document.createElement("p");
+                description.innerText = "Description: " + filterDescription(imageData.full_description);
+                description.style.fontSize = "16px";
+                description.style.color = "#555";
+                description.style.marginTop = "10px";
+                description.style.textAlign = "center";
+
+                let uploadTime = document.createElement("p");
+                uploadTime.innerText = "Uploaded At: " + imageData.uploaded_at;
+                uploadTime.style.fontSize = "14px";
+                uploadTime.style.color = "#777";
+                uploadTime.style.marginTop = "5px";
+                uploadTime.style.textAlign = "center";
+
+                let colorsDiv = document.createElement("div");
+                colorsDiv.style.display = "flex";
+                colorsDiv.style.gap = "15px";
+                colorsDiv.style.marginTop = "10px";
+                colorsDiv.style.flexWrap = "wrap";
+                colorsDiv.style.justifyContent = "center";
+
+                imageData.dominant_colors.forEach(color => {
+                    let colorContainer = document.createElement("div");
+                    colorContainer.style.display = "flex";
+                    colorContainer.style.flexDirection = "column";
+                    colorContainer.style.alignItems = "center";
+
+                    let colorBox = document.createElement("div");
+                    colorBox.style.width = "30px";
+                    colorBox.style.height = "30px";
+                    colorBox.style.backgroundColor = color;
+                    colorBox.style.border = "1px solid #ddd";
+                    colorBox.style.borderRadius = "4px";
+
+                    let colorName = document.createElement("span");
+                    colorName.innerText = getColorName(color);
+                    colorName.style.fontSize = "12px";
+                    colorName.style.color = "#555";
+                    colorName.style.marginTop = "5px";
+
+                    colorContainer.appendChild(colorBox);
+                    colorContainer.appendChild(colorName);
+                    colorsDiv.appendChild(colorContainer);
+                });
+
+                imageDiv.appendChild(img);
+                imageDiv.appendChild(description);
+                imageDiv.appendChild(uploadTime);
+                imageDiv.appendChild(colorsDiv);
+                imagesContainer.appendChild(imageDiv);
+            });
+
+            document.getElementById("imagePreview").style.display = "block";
+        }
+    </script>
+{% endblock %}

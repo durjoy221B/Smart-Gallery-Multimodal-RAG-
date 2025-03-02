@@ -1,0 +1,30 @@
+{% extends "index.html" %}
+
+{% block title %}AI-Powered Photo Gallery{% endblock %}
+
+{% block content %}
+    <div class="hero">
+        <h1>AI-Powered Photo Gallery</h1>
+        <p>Explore a vast collection of images analyzed and organized by AI.
+            <br> Search for images based on descriptions or upload your own image to find similar ones.</p>
+        <a href="/upload" class="cta-button">Upload Image</a>
+
+        <a href="/chat" class="cta-button">Chat</a>
+    </div>
+
+    <div class="features">
+        <h2>Features</h2>
+        <div>
+            <h3>Upload Images</h3>
+            <p>Upload your images, and they will be analyzed by AI and stored for easy searching.</p>
+        </div>
+        <div>
+            <h3>Gallery</h3>
+            <p>Browse through all the uploaded images in a gallery.</p>
+        </div>
+        <div>
+            <h3>Search by Text or Image </h3>
+            <p>A chatbot will help you to find your image.</p>
+        </div>
+    </div>
+{% endblock %}

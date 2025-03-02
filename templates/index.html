@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI-Powered Photo Gallery{% endblock %}</title>
+    <style>
+        /* General Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Calibri', sans-serif;
+            background-color: #ffffff;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* Space between title and links */
+            padding: 10px 20px; /* Smaller padding for reduced height */
+            background-color: #aaaaaa;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            height: 50px; /* Smaller fixed height */
+        }
+
+        .nav-title {
+            font-size: 20px; /* Slightly smaller than before */
+            font-weight: bold;
+            color: white;
+            text-decoration: none;
+            margin-left: 20px; /* Space from left edge */
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 15px; /* Reduced gap */
+            margin-right: 20px; /* Space from right edge */
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: white;
+            font-size: 16px; /* Smaller font */
+            padding: 6px 12px; /* Smaller padding */
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .nav-links a:hover {
+            background-color: #3a4664;
+        }
+
+        /* Active page styling */
+        .nav-links a.active {
+            background-color: #3a4664;
+            color: white;
+            pointer-events: none;
+        }
+
+        .cta-button {
+            text-decoration: none;
+            background-color: #546799;
+            color: white;
+            font-size: 18px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+            border: none;
+        }
+
+        .cta-button:hover {
+            background-color: #3a4664;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px;
+            padding: 0px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .hero {
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        h1, h2 {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        p {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .features {
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        .features h2 {
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+
+        .features div {
+            margin-bottom: 20px;
+        }
+
+        .features h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #3a4664;
+        }
+
+        .features p {
+            font-size: 16px;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <a href="/" class="nav-title">AI Memory Bot</a>
+        <div class="nav-links">
+            <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Home</a>
+            <a href="/upload" class="{% if request.url.path == '/upload' %}active{% endif %}">Upload</a>
+            <a href="/gallery" class="{% if request.url.path == '/gallery' %}active{% endif %}">Gallery</a>
+            <a href="/chat" class="{% if request.url.path == '/chat' %}active{% endif %}">Chat</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% block content %}
+        {% endblock %}
+    </div>
+</body>
+
+</html>
